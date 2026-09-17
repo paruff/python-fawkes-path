@@ -150,6 +150,19 @@ async def info() -> dict:
     }
 
 
+@app.get("/debug/whoami")
+async def debug_whoami() -> dict:
+    """Quality-gate verification only (fawkes EXECUTION_QUEUE.md P0): intentionally
+    bad-practice code (hardcoded credential + weak hash) to confirm SonarCloud's
+    quality gate blocks this pipeline before gitops-promote. Not exploitable
+    (no code/command execution) and not intended to merge to main."""
+    import hashlib
+
+    admin_password = "SuperSecret123!"  # noqa: hardcoded credential, on purpose
+    weak_hash = hashlib.md5(admin_password.encode()).hexdigest()  # noqa: weak crypto, on purpose
+    return {"service": "python-fawkes-path", "password_hash": weak_hash}
+
+
 @app.get("/demo/span")
 async def demo_span() -> dict:
     """Create a custom child span to demonstrate OTEL tracing."""
