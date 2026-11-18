@@ -1,0 +1,52 @@
+name: DORA event (test environment)
+
+# Runs the unit tests on the NAS runner and reports the outcome to uFawkesObs as a
+# deployment event in the "test" environment, so real passing and failing runs can
+# prove the event path end to end. Manual only: the self-hosted runner never serves
+# push or pull_request events (uFawkesPipe docs/ci-runner-image/spec.md, R4).
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: "Fail the test step on purpose, to produce a failed event"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  run-and-report:
+    runs-on: [self-hosted, pipe-ci]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: |
+          if [ "${{ inputs.simulate_failure }}" = "true" ]; then
+            echo "::error::simulated failure (simulate_failure=true)"; exit 1
+          fi
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pytest -m unit
+
+      # uFawkesPipe's emitter, pinned to the commit of release v1.17.1-beta.1.
+      - name: Check out the emitter
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          repository: paruff/uFawkesPipe
+          ref: 16b79bcbfc9989480aecd7d1cada9b97e87d7847
+          path: .pipe
+
+      - name: Report the outcome to uFawkesObs
+        if: always()
+        env:
+          DORA_ENVIRONMENT: test
+          DORA_INGESTION_URL: ${{ secrets.DORA_INGESTION_URL }}
+          DORA_API_KEY: ${{ secrets.DORA_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .pipe/scripts/emit-dora-event.sh deploy-marker \
+            --status "${{ job.status == 'success' && 'success' || 'failure' }}"
