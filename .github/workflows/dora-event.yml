@@ -24,12 +24,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Unit tests
+        env:
+          OTEL_SDK_DISABLED: "true"  # no collector to reach from here
         run: |
           if [ "${{ inputs.simulate_failure }}" = "true" ]; then
             echo "::error::simulated failure (simulate_failure=true)"; exit 1
           fi
-          python -m pip install -r requirements.txt -r requirements-dev.txt
-          python -m pytest -m unit
+          # The runner image's Python has no pip or ensurepip; it ships uv.
+          uv venv .venv -q
+          uv pip install -q --python .venv/bin/python -r requirements.txt -r requirements-dev.txt
+          .venv/bin/python -m pytest -m unit
 
       # uFawkesPipe's emitter, pinned to the commit of release v1.17.1-beta.1.
       - name: Check out the emitter
