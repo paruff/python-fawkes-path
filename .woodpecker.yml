@@ -27,8 +27,6 @@ steps:
   environment:
     DORA_INGESTION_URL:
       from_secret: dora_ingestion_url
-    DORA_API_KEY:
-      from_secret: dora_api_key
   commands:
   - ': "${DORA_INGESTION_URL:?dora_ingestion_url secret is not set}"'
   - DEPLOY_STATUS=success; [ "${CI_PIPELINE_STATUS:-success}" = "success" ] || DEPLOY_STATUS=failed
