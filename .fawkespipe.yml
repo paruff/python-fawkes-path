@@ -1,0 +1,17 @@
+# Pipeline contract for python-fawkes-path, the uFawkesPipe v2.0.0 sample app.
+# Regenerate .woodpecker.yml from uFawkesPipe: make generate-pipeline FILE=<this file> OUTPUT=<.woodpecker.yml>
+app:
+  name: python-fawkes-path
+  type: service
+  language: python
+
+build:
+  builder: cnb
+  cnb:
+    builder: paketobuildpacks/builder:base
+
+stages:
+  build:
+    enabled: true
+  notify_obs:
+    enabled: true
