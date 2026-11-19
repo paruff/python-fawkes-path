@@ -15,8 +15,10 @@ steps:
   - AUTH=$(printf '%s:%s' "$REGISTRY_USERNAME" "$REGISTRY_PASSWORD" | base64 | tr
     -d '\n')
   - printf '{"auths":{"https://index.docker.io/v1/":{"auth":"%s"}}}' "$AUTH" > "$HOME/.docker/config.json"
-  - pack build ${REGISTRY_USERNAME}/${CI_REPO_NAME}:${CI_COMMIT_SHA:0:7} --builder
-    paketobuildpacks/builder:base --path . --publish
+  - pack build $REGISTRY_USERNAME/${CI_REPO_NAME}:${CI_COMMIT_SHA:0:7} --builder paketobuildpacks/builder:base
+    --path . --publish
+  volumes:
+  - /var/run/docker.sock:/var/run/docker.sock
   when:
     event:
     - push
@@ -28,14 +30,16 @@ steps:
     DORA_INGESTION_URL:
       from_secret: dora_ingestion_url
   commands:
-  - ': "${DORA_INGESTION_URL:?dora_ingestion_url secret is not set}"'
+  - '[ -n "$DORA_INGESTION_URL" ] || { echo "dora_ingestion_url secret is not set";
+    exit 1; }'
   - DEPLOY_STATUS=success; [ "${CI_PIPELINE_STATUS:-success}" = "success" ] || DEPLOY_STATUS=failed
   - BODY=$(printf '{"schema_version":"1.0","event_type":"deployment","repo":"%s","service":"%s","environment":"production","commit_sha":"%s","deployed_at":"%s","status":"%s","pipeline_url":"%s"}'
     "$CI_REPO" "$CI_REPO_NAME" "$CI_COMMIT_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$DEPLOY_STATUS"
     "$CI_PIPELINE_URL")
-  - 'CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$DORA_INGESTION_URL/event"
-    -H "Content-Type: application/json" ${DORA_API_KEY:+-H "Authorization: Bearer
-    $DORA_API_KEY"} -d "$BODY")'
+  - 'set -- -s -o /dev/null -w "%{http_code}" -X POST "$DORA_INGESTION_URL/event"
+    -H "Content-Type: application/json"'
+  - '[ -z "$DORA_API_KEY" ] || set -- "$@" -H "Authorization: Bearer $DORA_API_KEY"'
+  - CODE=$(curl "$@" -d "$BODY")
   - echo "DORA event HTTP $CODE"
   - '[ "$CODE" = "201" ]'
   failure: ignore
